@@ -675,6 +675,8 @@ public final class MediaDriver implements AutoCloseable
                 concludeDependantProperties();
                 concludeIdleStrategies();
 
+                systemCounters.get(BYTES_CURRENTLY_MAPPED).setOrdered(cncFileLength + lossReportBufferLength);
+
                 toDriverCommands.nextCorrelationId();
                 toDriverCommands.consumerHeartbeatTime(epochClock.time());
                 CncFileDescriptor.signalCncReady(cncMetaDataBuffer);
@@ -3780,6 +3782,40 @@ public final class MediaDriver implements AutoCloseable
             }
         }
 
+        private void concludeCounters()
+        {
+            if (null == countersManager)
+            {
+                if (countersMetaDataBuffer() == null)
+                {
+                    countersMetaDataBuffer(createCountersMetaDataBuffer(cncByteBuffer, cncMetaDataBuffer));
+                }
+
+                if (countersValuesBuffer() == null)
+                {
+                    countersValuesBuffer(createCountersValuesBuffer(cncByteBuffer, cncMetaDataBuffer));
+                }
+
+                final long reuseTimeoutMs = counterFreeToReuseTimeoutNs > 0 ?
+                    Math.max(TimeUnit.NANOSECONDS.toMillis(counterFreeToReuseTimeoutNs), 1) : 0;
+
+                countersManager = useConcurrentCountersManager ?
+                    new ConcurrentCountersManager(
+                        countersMetaDataBuffer(), countersValuesBuffer(), US_ASCII, cachedEpochClock, reuseTimeoutMs) :
+                    new CountersManager(
+                        countersMetaDataBuffer(), countersValuesBuffer(), US_ASCII, cachedEpochClock, reuseTimeoutMs);
+            }
+
+            if (null == systemCounters)
+            {
+                systemCounters = new SystemCounters(countersManager);
+            }
+
+            final int aeronVersion = SemanticVersion.compose(
+                MediaDriverVersion.MAJOR_VERSION, MediaDriverVersion.MINOR_VERSION, MediaDriverVersion.PATCH_VERSION);
+            systemCounters.get(AERON_VERSION).set(aeronVersion);
+        }
+
         private void concludeDependantProperties()
         {
             clientProxy = new ClientProxy(new BroadcastTransmitter(
@@ -3805,7 +3841,12 @@ public final class MediaDriver implements AutoCloseable
             if (null == logFactory)
             {
                 logFactory = new FileStoreLogFactory(
-                    aeronDirectoryName(), filePageSize, performStorageChecks, lowStorageWarningThreshold, errorHandler);
+                    aeronDirectoryName(),
+                    filePageSize,
+                    performStorageChecks,
+                    lowStorageWarningThreshold,
+                    errorHandler,
+                    systemCounters.get(BYTES_CURRENTLY_MAPPED));
             }
 
             if (null == lossReport)
@@ -3867,40 +3908,6 @@ public final class MediaDriver implements AutoCloseable
             }
 
             nameResolver.init(countersManager, countersManager::newCounter);
-        }
-
-        private void concludeCounters()
-        {
-            if (null == countersManager)
-            {
-                if (countersMetaDataBuffer() == null)
-                {
-                    countersMetaDataBuffer(createCountersMetaDataBuffer(cncByteBuffer, cncMetaDataBuffer));
-                }
-
-                if (countersValuesBuffer() == null)
-                {
-                    countersValuesBuffer(createCountersValuesBuffer(cncByteBuffer, cncMetaDataBuffer));
-                }
-
-                final long reuseTimeoutMs = counterFreeToReuseTimeoutNs > 0 ?
-                    Math.max(TimeUnit.NANOSECONDS.toMillis(counterFreeToReuseTimeoutNs), 1) : 0;
-
-                countersManager = useConcurrentCountersManager ?
-                    new ConcurrentCountersManager(
-                        countersMetaDataBuffer(), countersValuesBuffer(), US_ASCII, cachedEpochClock, reuseTimeoutMs) :
-                    new CountersManager(
-                        countersMetaDataBuffer(), countersValuesBuffer(), US_ASCII, cachedEpochClock, reuseTimeoutMs);
-            }
-
-            if (null == systemCounters)
-            {
-                systemCounters = new SystemCounters(countersManager);
-            }
-
-            final int aeronVersion = SemanticVersion.compose(
-                MediaDriverVersion.MAJOR_VERSION, MediaDriverVersion.MINOR_VERSION, MediaDriverVersion.PATCH_VERSION);
-            systemCounters.get(AERON_VERSION).set(aeronVersion);
         }
 
         private void concludeIdleStrategies()

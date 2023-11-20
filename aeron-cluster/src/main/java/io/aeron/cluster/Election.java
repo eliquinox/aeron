@@ -26,6 +26,7 @@ import io.aeron.cluster.client.ClusterException;
 import io.aeron.cluster.service.Cluster;
 import io.aeron.exceptions.AeronException;
 import io.aeron.exceptions.TimeoutException;
+import io.aeron.status.ChannelEndpointStatus;
 import org.agrona.CloseHelper;
 import org.agrona.LangUtil;
 import org.agrona.collections.Int2ObjectHashMap;
@@ -618,13 +619,10 @@ class Election
 
             if (null != logSubscription)
             {
-                final long subscriptionRegistrationId = logSubscription.registrationId();
-
                 CloseHelper.close(logSubscription);
-                consensusModuleAgent.awaitLocalSocketsClosed(subscriptionRegistrationId);
+                consensusModuleAgent.awaitLocalSocketsClosed(logSubscription.registrationId());
+                logSubscription = null;
             }
-
-            logSubscription = null;
         }
 
         candidateTermId = max(ctx.nodeStateFile().candidateTerm().candidateTermId(), leadershipTermId);
@@ -984,6 +982,11 @@ class Election
                 state(FOLLOWER_CATCHUP, nowNs);
                 workCount++;
             }
+            else if (ChannelEndpointStatus.ERRORED == logSubscription.channelStatus())
+            {
+                final String message = "failed to add catchup log as follower - " + logSubscription.channel();
+                throw new ClusterException(message, AeronException.Category.WARN);
+            }
             else if (nowNs >= (timeOfLastStateChangeNs + ctx.leaderHeartbeatTimeoutNs()))
             {
                 throw new TimeoutException("failed to join catchup log as follower", AeronException.Category.WARN);
@@ -1062,6 +1065,11 @@ class Election
             {
                 throw new TimeoutException("failed to join live log as follower", AeronException.Category.WARN);
             }
+        }
+        else if (ChannelEndpointStatus.ERRORED == logSubscription.channelStatus())
+        {
+            final String message = "failed to add live log as follower - " + logSubscription.channel();
+            throw new ClusterException(message, AeronException.Category.WARN);
         }
         else if (nowNs >= (timeOfLastStateChangeNs + ctx.leaderHeartbeatTimeoutNs()))
         {

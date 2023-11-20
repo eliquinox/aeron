@@ -82,17 +82,9 @@ int aeron_publication_image_create(
 
     *image = NULL;
 
-    if (context->perform_storage_checks)
+    if (aeron_driver_context_run_storage_checks(context, log_length) < 0)
     {
-        const uint64_t usable_space = context->usable_fs_space_func(context->aeron_dir);
-        if (usable_space < log_length)
-        {
-            AERON_SET_ERR(
-                -AERON_ERROR_CODE_STORAGE_SPACE,
-                "Insufficient usable storage for new log of length=%" PRId64 " usable=%" PRId64
-                " in %s", log_length, usable_space, context->aeron_dir);
-            return -1;
-        }
+        return -1;
     }
 
     if (aeron_alloc((void **)&_image, sizeof(aeron_publication_image_t)) < 0)
@@ -127,6 +119,11 @@ int aeron_publication_image_create(
         AERON_APPEND_ERR("error mapping network raw log: %s", path);
         goto error;
     }
+
+    _image->mapped_bytes_counter = aeron_system_counter_addr(
+        system_counters, AERON_SYSTEM_COUNTER_BYTES_CURRENTLY_MAPPED);
+    aeron_counter_add_ordered(_image->mapped_bytes_counter, (int64_t)log_length);
+
     _image->raw_log_close_func = context->raw_log_close_func;
     _image->raw_log_free_func = context->raw_log_free_func;
     _image->untethered_subscription_state_change_func = context->untethered_subscription_on_state_change_func;
@@ -293,6 +290,8 @@ bool aeron_publication_image_free(aeron_publication_image_t *image)
     {
         return false;
     }
+
+    aeron_counter_add_ordered(image->mapped_bytes_counter, -((int64_t)image->mapped_raw_log.mapped_file.length));
 
     aeron_free(image->log_file_name);
     aeron_free(image);

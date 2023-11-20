@@ -78,16 +78,6 @@ final class LogPublisher
         }
     }
 
-    boolean isConnected()
-    {
-        if (null == publication)
-        {
-            return false;
-        }
-
-        return publication.isConnected();
-    }
-
     long position()
     {
         if (null == publication)
@@ -108,15 +98,6 @@ final class LogPublisher
         if (isLogChannelMultiDestination && null != publication)
         {
             publication.asyncAddDestination(ChannelUri.createDestinationUri(destinationChannel, followerLogEndpoint));
-        }
-    }
-
-    void removeDestination(final boolean isLogChannelMultiDestination, final String followerLogEndpoint)
-    {
-        if (isLogChannelMultiDestination && null != publication)
-        {
-            publication.asyncRemoveDestination(
-                ChannelUri.createDestinationUri(destinationChannel, followerLogEndpoint));
         }
     }
 

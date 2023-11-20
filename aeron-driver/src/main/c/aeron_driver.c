@@ -586,6 +586,7 @@ void aeron_driver_context_print_configuration(aeron_driver_context_t *context)
     fprintf(fpout, "\n    mtu_length=%" PRIu64, (uint64_t)context->mtu_length);
     fprintf(fpout, "\n    ipc_mtu_length=%" PRIu64, (uint64_t)context->ipc_mtu_length);
     fprintf(fpout, "\n    file_page_size=%" PRIu64, (uint64_t)context->file_page_size);
+    fprintf(fpout, "\n    low_file_store_warning_threshold=%" PRIu64, (uint64_t)context->low_file_store_warning_threshold);
     fprintf(fpout, "\n    publication_reserved_session_id_low=%" PRId32, context->publication_reserved_session_id_low);
     fprintf(fpout, "\n    publication_reserved_session_id_high=%" PRId32, context->publication_reserved_session_id_high);
     fprintf(fpout, "\n    loss_report_length=%" PRIu64, (uint64_t)context->loss_report_length);
@@ -905,10 +906,6 @@ int aeron_driver_init(aeron_driver_t **driver, aeron_driver_context_t *context)
         goto error;
     }
 
-    aeron_counter_set_ordered(
-        aeron_system_counter_addr(context->system_counters, AERON_SYSTEM_COUNTER_AERON_VERSION),
-        aeron_semantic_version_compose(aeron_version_major(), aeron_version_minor(), aeron_version_patch()));
-
     if (aeron_driver_sender_init(
         &_driver->sender, context, &_driver->conductor.system_counters, &_driver->conductor.error_log) < 0)
     {
@@ -924,6 +921,14 @@ int aeron_driver_init(aeron_driver_t **driver, aeron_driver_context_t *context)
     }
 
     _driver->context->receiver_proxy = &_driver->receiver.receiver_proxy;
+
+    aeron_counter_set_ordered(
+        aeron_system_counter_addr(context->system_counters, AERON_SYSTEM_COUNTER_AERON_VERSION),
+        aeron_semantic_version_compose(aeron_version_major(), aeron_version_minor(), aeron_version_patch()));
+
+    aeron_counter_set_ordered(
+        aeron_system_counter_addr(context->system_counters, AERON_SYSTEM_COUNTER_BYTES_CURRENTLY_MAPPED),
+        (int64_t)(_driver->context->cnc_map.length + _driver->context->loss_report_length));
 
     aeron_mpsc_rb_next_correlation_id(&_driver->conductor.to_driver_commands);
     aeron_mpsc_rb_consumer_heartbeat_time(&_driver->conductor.to_driver_commands, aeron_epoch_clock());

@@ -128,12 +128,12 @@ public final class AeronCounters
      */
     public static final int DRIVER_LOCAL_SOCKET_ADDRESS_STATUS_TYPE_ID = 14;
 
-    /*
+    /**
      * Count of number of active receivers for flow control strategy.
      */
     public static final int FLOW_CONTROL_RECEIVERS_COUNTER_TYPE_ID = 17;
 
-    /*
+    /**
      * Count of number of destinations for multi-destination cast channels.
      */
     public static final int MDC_DESTINATIONS_COUNTER_TYPE_ID = 18;
@@ -383,6 +383,17 @@ public final class AeronCounters
      */
     public static final int NODE_CONTROL_TOGGLE_TYPE_ID = 233;
 
+    /**
+     * The type id of the {@link Counter} used for keeping track of the maximum total snapshot duration.
+     */
+    public static final int CLUSTER_TOTAL_MAX_SNAPSHOT_DURATION_TYPE_ID = 234;
+
+    /**
+     * The type id of the {@link Counter} used for keeping track of the count total snapshot duration
+     * has exceeded the threshold.
+     */
+    public static final int CLUSTER_TOTAL_SNAPSHOT_DURATION_THRESHOLD_EXCEEDED_TYPE_ID = 235;
+
     private AeronCounters()
     {
     }
@@ -406,8 +417,9 @@ public final class AeronCounters
         if (expectedCounterTypeId != counterTypeId)
         {
             throw new ConfigurationException(
-                "The type for counterId=" + counterId + ", typeId=" + counterTypeId + " does not match the expected=" +
-                expectedCounterTypeId);
+                "The type for counterId=" + counterId +
+                ", typeId=" + counterTypeId +
+                " does not match the expected=" + expectedCounterTypeId);
         }
     }
 
@@ -498,7 +510,7 @@ public final class AeronCounters
     }
 
     /**
-     * Format version information to dislay purposes.
+     * Format version information for display purposes.
      *
      * @param fullVersion of the component.
      * @param commitHash  Git commit SHA.
